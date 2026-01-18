@@ -184,14 +184,6 @@ export default function StationModal({ station, onClose, children, isTutorialMod
                                 {children}
                             </div>
                         )}
-
-                        {/* Close Button */}
-                        <button
-                            onClick={onClose}
-                            className="w-full bg-gradient-to-r from-db-red to-red-700 hover:from-red-700 hover:to-db-red text-white font-bold py-5 px-8 rounded-xl transition-all mt-10 text-xl shadow-lg hover:shadow-2xl transform hover:scale-[1.02] active:scale-95"
-                        >
-                            ✓ {content.close}
-                        </button>
                     </div>
                 </motion.div>
             </motion.div>

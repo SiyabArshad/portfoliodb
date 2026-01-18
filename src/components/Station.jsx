@@ -62,7 +62,7 @@ export default function Station({ station, xPos, onStationClick, isCurrentStop, 
                     <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="absolute top-3 right-3 bg-emerald-600 text-white px-3 py-1 text-[9px] font-black font-mono rounded shadow-lg z-20 flex items-center space-x-2 border border-white/20"
+                        className="absolute top-3 right-3 bg-db-red text-white px-3 py-1 text-[9px] font-black font-mono rounded shadow-lg z-20 flex items-center space-x-2 border border-white/20"
                     >
                         <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
                         <span className="uppercase tracking-wider">{announcement || content.halt}</span>

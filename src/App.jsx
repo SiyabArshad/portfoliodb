@@ -16,6 +16,7 @@ import FiverrReviews from './components/FiverrReviews';
 import { careerData, skillsData, linkedInReviews, fiverrReviews } from './data';
 import { audioManager } from './utils/audio';
 import TutorialHand from './components/TutorialHand';
+import ControlsPopup from './components/ControlsPopup';
 
 const STATION_SPACING = 2500;
 const TRACK_LENGTH = (careerData.length + 1) * STATION_SPACING + 3000;
@@ -24,6 +25,7 @@ function App() {
   const [gameStarted, setGameStarted] = useState(false);
   const [language, setLanguage] = useState('en'); // 'en' or 'de'
   const [isMuted, setIsMuted] = useState(false);
+  const [showControlsPopup, setShowControlsPopup] = useState(false);
   const [progress, setProgress] = useState(0);
   const [region, setRegion] = useState('pk');
   const [announcement, setAnnouncement] = useState("");
@@ -59,6 +61,23 @@ function App() {
   useEffect(() => {
     isLockedRef.current = isLocked;
   }, [isLocked]);
+
+  // Preload voices for speech synthesis
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      // Load voices on mount
+      const loadVoices = () => {
+        const voices = window.speechSynthesis.getVoices();
+        console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+      };
+
+      // Voices might load asynchronously
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+      loadVoices();
+    }
+  }, []);
 
   // Automated Guided Journey Logic
   useEffect(() => {
@@ -109,20 +128,46 @@ function App() {
     } else if (latest <= 0.7 && region !== 'pk') {
       setRegion('pk');
     }
+
+    // Declare these once for use throughout this scope
+    const trainScreenX = (0.2 * window.innerWidth) + 300;
+    const scrollableWidth = TRACK_LENGTH - window.innerWidth;
+
     // Clear announcement if we move away
     if (announcement && lastStoppedStationRef.current !== -1) {
-      const trainScreenX = (0.2 * window.innerWidth) + 300;
-      const scrollableWidth = TRACK_LENGTH - window.innerWidth;
       const stoppedProgress = (careerData[lastStoppedStationRef.current] ? ((lastStoppedStationRef.current + 1) * STATION_SPACING + 1500 - trainScreenX) / scrollableWidth : -1);
       if (Math.abs(latest - stoppedProgress) > 0.002) {
         setAnnouncement("");
       }
     }
 
+    // Check if train is between Cottbus (index 6) and Berlin (index 7)
+    // Show delay announcement due to track work in Lübbenau
+    if (scrollableWidth > 0) {
+      const cottbusX = (6 + 1) * STATION_SPACING + 1500;
+      const berlinX = (7 + 1) * STATION_SPACING + 1500;
+      const cottbusProgress = (cottbusX - trainScreenX) / scrollableWidth;
+      const berlinProgress = (berlinX - trainScreenX) / scrollableWidth;
+
+      // If we're between these two stations and not stopped at a station
+      if (latest > cottbusProgress && latest < berlinProgress && !isAtStation) {
+        const delayMsg = language === 'de'
+          ? "⚠️ Verzögerung wegen Gleisarbeiten in Lübbenau"
+          : "⚠️ Delay due to track work in Lübbenau";
+        if (announcement !== delayMsg) {
+          setAnnouncement(delayMsg);
+        }
+      } else if (latest <= cottbusProgress || latest >= berlinProgress) {
+        // Clear the delay announcement when we're outside this range
+        if (announcement.includes("Lübbenau") || announcement.includes("Delay")) {
+          setAnnouncement("");
+        }
+      }
+    }
+
     // BULLETPROOF Aggressive Station Stop Logic: Scans all stations for center crossings
     // The exact screen X where we want the station to align (Train center is at 20vw + 300px)
-    const trainScreenX = (0.2 * window.innerWidth) + 300;
-    const scrollableWidth = TRACK_LENGTH - window.innerWidth;
+
 
     for (let i = 0; i < careerData.length; i++) {
       // Skip if we just stopped here or are currently stopped
@@ -184,13 +229,19 @@ function App() {
 
         audioManager.playHorn(); // Auto horn on arrival
 
-        // Audio: Dynamic Language Announcement
+        // Audio: Dynamic Language Announcement (Deutsche Bahn Style)
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel();
 
-          const prefix = language === 'en' ? 'Next Station' : 'Nächste Station';
-          const stationNameSpoken = language === 'de' ? (station.title_de || station.title) : station.title;
-          const spokenText = `${prefix}: ${stationNameSpoken}`;
+          // Authentic Deutsche Bahn announcement style
+          let spokenText;
+          if (language === 'de') {
+            const stationNameSpoken = station.title_de || station.title;
+            // Real DB style: "Nächster Halt: [Station]. Ausstieg links/rechts."
+            spokenText = `Nächster Halt: ${stationNameSpoken}. Ausstieg links.`;
+          } else {
+            spokenText = `Next Station: ${station.title}`;
+          }
 
           const utterance = new SpeechSynthesisUtterance(spokenText);
           utteranceRef.current = utterance;
@@ -207,7 +258,9 @@ function App() {
             }
           }
 
-          utterance.rate = 0.9;
+          // Slower, more deliberate pace like real DB announcements
+          utterance.rate = language === 'de' ? 0.85 : 0.9;
+          utterance.pitch = language === 'de' ? 1.0 : 1.0;
           utterance.volume = 1.0;
           window.speechSynthesis.speak(utterance);
         }
@@ -331,6 +384,13 @@ function App() {
       setGameStarted(true);
       audioManager.startEngine();
       audioManager.playHorn(); // Welcome horn
+
+      // Show controls popup after a brief delay (only in normal mode, not demo)
+      if (!isDemo) {
+        setTimeout(() => {
+          setShowControlsPopup(true);
+        }, 1000);
+      }
     }, 150);
   };
 
@@ -419,7 +479,19 @@ function App() {
               language={language}
             />
 
-            {/* Announcement is now handled inside Station cards for a cleaner look */}
+            {/* Announcement Banner - Shows delay messages and other announcements */}
+            {announcement && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="fixed top-32 left-1/2 -translate-x-1/2 z-50 bg-db-red/95 backdrop-blur-md border-2 border-white/20 px-8 py-4 rounded-xl shadow-2xl"
+              >
+                <p className="text-white font-bold text-lg font-mono tracking-wider uppercase text-center">
+                  {announcement}
+                </p>
+              </motion.div>
+            )}
           </>
         )}
 
@@ -567,6 +639,14 @@ function App() {
       </div>
 
       {/* Station Modal - Moved outside to guarantee top-level stacking */}
+      {/* Controls Popup */}
+      {showControlsPopup && (
+        <ControlsPopup
+          language={language}
+          onDismiss={() => setShowControlsPopup(false)}
+        />
+      )}
+
       {selectedStation && (
         <StationModal
           station={selectedStation}
@@ -618,7 +698,7 @@ function App() {
             <div className="space-y-6">
               <LinkedInReviews reviews={linkedInReviews} />
               <div className="mt-8 pt-6 border-t border-white/10">
-                <h4 className="text-xl font-bold text-emerald-500 uppercase tracking-widest mb-4">Device Engineering</h4>
+                <h4 className="text-xl font-bold text-db-red uppercase tracking-widest mb-4">Device Engineering</h4>
                 <p className="text-gray-300">Engineered complex BLE handshake protocols for clinical audiometry devices, ensuring 99.9% data packet delivery in noisy clinic environments.</p>
               </div>
             </div>
@@ -626,7 +706,7 @@ function App() {
 
           {selectedStation.id === 'education_taxila' && (
             <div className="space-y-6">
-              <h4 className="text-xl font-bold text-blue-500 uppercase tracking-widest border-b border-blue-500/20 pb-2">Capstone Project: AI Vision</h4>
+              <h4 className="text-xl font-bold text-db-red uppercase tracking-widest border-b border-db-red/20 pb-2">Capstone Project: AI Vision</h4>
               <div className="bg-black/30 p-4 rounded-xl border border-white/5">
                 <p className="text-white font-medium">Built a real-time traffic violation detection system using YOLO. Achieved 94% accuracy in identifying helmet-less motorcyclists.</p>
               </div>
@@ -636,7 +716,7 @@ function App() {
 
           {selectedStation.id === 'logicator' && (
             <div className="space-y-6">
-              <h4 className="text-xl font-bold text-orange-500 uppercase tracking-widest border-b border-orange-500/20 pb-2">Technical Contribution</h4>
+              <h4 className="text-xl font-bold text-db-red uppercase tracking-widest border-b border-db-red/20 pb-2">Technical Contribution</h4>
               <div className="bg-black/30 p-4 rounded-xl border border-white/5">
                 <p className="text-white font-medium">Developed a highly scalable coupon engine supporting 50k+ daily transactions. Implemented granular inventory tracking to prevent stock discrepancies.</p>
               </div>
@@ -646,7 +726,7 @@ function App() {
 
           {selectedStation.id === 'germany_move' && (
             <div className="space-y-6">
-              <h4 className="text-xl font-bold text-yellow-500 uppercase tracking-widest border-b border-yellow-500/20 pb-2">Preparation for AI Focus</h4>
+              <h4 className="text-xl font-bold text-db-red uppercase tracking-widest border-b border-db-red/20 pb-2">Preparation for AI Focus</h4>
               <div className="bg-black/30 p-4 rounded-xl border border-white/5">
                 <p className="text-white font-medium">Completed intensive self-study in Linear Algebra, Vector Calculas, and Deep Learning Fundamentals prior to relocating to ensure success in the Master's program.</p>
               </div>
