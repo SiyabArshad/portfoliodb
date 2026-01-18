@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-db-red: #EC1B2D;
+  --color-db-red-dark: #C50F1F;
+  --color-db-light-grey: #F0F3F5;
+  --color-db-dark-grey: #282D37;
+  /* Anthracite */
+  --color-db-deep-blue: #131821;
+  /* Dark Mode Background */
+  --color-db-cool-gray: #8C8C8C;
+  --color-db-warm-sand: #E6DBCB;
+  /* For Pakistan/East section */
+}
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  /* Force Dark Scheme */
+  color: #FFFFFF;
+  background-color: var(--color-db-deep-blue);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--color-db-deep-blue);
+}
+
+/* Custom Scrollbar hide */
+::-webkit-scrollbar {
+  display: none;
+}
