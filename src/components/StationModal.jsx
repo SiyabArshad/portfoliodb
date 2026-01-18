@@ -3,7 +3,7 @@ import { X, MapPin, Calendar, Building2 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import TutorialHand from './TutorialHand';
 
-export default function StationModal({ station, onClose, children, isTutorialMode }) {
+export default function StationModal({ station, onClose, children, isTutorialMode, language }) {
     const modalRef = useRef(null);
 
     // Prevent background scrolling when modal is open
